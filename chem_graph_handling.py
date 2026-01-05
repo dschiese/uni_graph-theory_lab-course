@@ -5,7 +5,6 @@ import networkx as nx
 
 rsmi = '[CH3:1][CH:2]=[O:3].[CH:4]([H:7])([H:8])[CH:5]=[O:6]>>[CH3:1][CH:2]=[CH:4][CH:5]=[O:6].[O:3]([H:7])([H:8])'
 
-
 # Parse Individual Chemical Graphs as NetworkX Objects
 
 educt_graph, product_graph = rsmi_to_graph(rsmi)
