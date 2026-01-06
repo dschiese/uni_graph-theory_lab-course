@@ -2,7 +2,7 @@ from synkit.IO import rsmi_to_graph
 from _blake2 import blake2b
 from networkx.algorithms import all_pairs_shortest_path
 
-hasher = blake2b(digest_size=16)
+hasher = blake2b(digest_size=32)
 
 def phi_vertex(rsmi: str):
     graph, _ = rsmi_to_graph(rsmi)
@@ -18,7 +18,7 @@ def phi_vertex(rsmi: str):
     # Hash the labels
     for value in vertex_set.values():
         hasher.update(value.encode('utf-8'))
-        hashed = hasher.digest()  # Get the actual hash
+        hashed = hasher.digest().hex()  # Get the actual hash
         vertex_labels.append(hashed)  # Append the hashed value
   
     return vertex_labels
@@ -44,7 +44,7 @@ def phi_edge(rsmi: str):
         result = f"{u}{d['order']}{v}"
         # Hash edge representation
         hasher.update(result.encode('utf-8'))
-        hashed = hasher.digest()  # Get the actual hash
+        hashed = hasher.digest().hex()  # Get the actual hash
         edge_set.append(hashed)  # Append the hashed value
   
     return edge_set
@@ -64,7 +64,7 @@ def phi_shortest_path(rmsi: str):
             label_path = f"{node_to_label[source]}{label_path}{node_to_label[target]}"
             # Hash label_path
             hasher.update(label_path.encode('utf-8'))
-            hashed = hasher.digest()  # Get the actual hash
+            hashed = hasher.digest().hex()  # Get the actual hash
             paths_set.append(hashed)  # Append the hashed value
   
     return paths_set
@@ -87,7 +87,7 @@ def phi_vertex_graph(graph):
     # Hash the labels
     for value in vertex_set.values():
         hasher.update(value.encode('utf-8'))
-        hashed = hasher.digest()  # Get the actual hash
+        hashed = hasher.digest().hex()  # Get the actual hash
         vertex_labels.append(hashed)  # Append the hashed value
   
     return vertex_labels
@@ -99,7 +99,7 @@ def phi_edge_graph(graph):
         result = f"{u}{d['order']}{v}"
         # Hash edge representation
         hasher.update(result.encode('utf-8'))
-        hashed = hasher.digest()  # Get the actual hash
+        hashed = hasher.digest().hex()  # Get the actual hash
         edge_set.append(hashed)  # Append the hashed value
   
     return edge_set
@@ -118,7 +118,7 @@ def phi_shortest_path_graph(graph):
             label_path = f"{node_to_label[source]}{label_path}{node_to_label[target]}"
             # Hash label_path
             hasher.update(label_path.encode('utf-8'))
-            hashed = hasher.digest()  # Get the actual hash
+            hashed = hasher.digest().hex()  # Get the actual hash
             paths_set.append(hashed)  # Append the hashed value
   
     return paths_set
