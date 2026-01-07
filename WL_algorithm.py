@@ -96,16 +96,13 @@ def getWL(graph, h_max):
         print(len(feature_setSP))
 
     print(f"Final feature set size: {len(feature_setN)}")
-    #print(feature_setE)
-    return feature_setN, feature_setE, feature_setSP
-
+    featureUnion = feature_setN.union(feature_setE).union(feature_setSP)
+    return featureUnion
 
 # --- Main Execution ---
 # Generate features for educt and product graphs
-a1,a2,a3 = getWL(educt_graph, 4)
-b1,b2,b3 = getWL(product_graph, 4)
+a= getWL(educt_graph, 4)
+b = getWL(product_graph, 4)
 
 # The reaction signature is the symmetric difference of the node features.
-signature1 = a1.symmetric_difference(b1)
-signature2 = a2.symmetric_difference(b2)
-signature3 = a3.symmetric_difference(b3)
+signature1 = a.symmetric_difference(b)
