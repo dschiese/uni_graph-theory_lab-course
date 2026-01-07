@@ -1,0 +1,111 @@
+"""Computes a reaction signature using a Weisfeiler-Lehman-based graph kernel."""
+from synkit.IO import rsmi_to_its, rsmi_to_graph
+from synkit.Vis import GraphVisualizer
+import matplotlib.pyplot as plt
+import networkx as nx
+import hashlib
+
+def get_hash(data: str):
+    """Returns a stable 64-bit integer from a string."""
+    return int(hashlib.blake2b(data.encode(), digest_size=8).hexdigest(), 16)
+
+# Example reaction SMILES string
+rsmi = '[CH3:1][CH:2]=[O:3].[CH:4]([H:7])([H:8])[CH:5]=[O:6]>>[CH3:1][CH:2]=[CH:4][CH:5]=[O:6].[O:3]([H:7])([H:8])'
+
+
+# Parse SMILES into educt and product graphs
+educt_graph, product_graph = rsmi_to_graph(rsmi)
+
+
+def getWL(graph, h_max):
+    """
+    Computes node, edge, and shortest-path features for a graph using a WL-like algorithm.
+
+    Args:
+        graph (nx.Graph): Input molecular graph.
+        h_max (int): Number of WL iterations.
+
+    Returns:
+        tuple[set, set, set]: Node, edge, and shortest-path feature sets.
+    """
+    feature_setN = set()
+    feature_setE = set()
+    feature_setSP = set()
+    shortest_pathsL = dict(nx.shortest_path_length(graph))
+    shortest_paths = dict(nx.shortest_path(graph))
+    # Initialize labels with element types
+    labels = {n: str(graph.nodes[n].get('element')) for n in graph.nodes()}
+    print(labels)
+    for label in labels.values():
+        feature_setN.add(get_hash(label))
+    for h in range(h_max+1):
+        # Generate edge features
+        for u,v,d in graph.edges(data=True):
+            l_a = labels[u]
+            l_b = labels[v]
+            l_ab = str(d.get('order'))
+
+            node_pair = sorted([l_a, l_b])
+            triplet = f"{node_pair[0]}{l_ab}{node_pair[1]}"
+            print(triplet)
+            feature_setE.add(get_hash(triplet))
+
+        new_labels = {}
+        # Generate shortest-path features
+        for n in graph.nodes():
+            for m in shortest_pathsL[n]:
+                if n != m:
+                    # Keep the original Element-Distance-Element feature
+                    l_n = labels[n]
+                    l_m = labels[m]
+                    distance = shortest_pathsL[n][m]
+                    node_pair = sorted([l_m, l_n])
+                    sp_feature_dist = f"{node_pair[0]}-{distance}-{node_pair[1]}"
+                    print(sp_feature_dist)
+                    feature_setSP.add(get_hash(sp_feature_dist))
+
+                    # Concatenated labels along the shortest path
+                    path_nodes = shortest_paths[n][m]
+                    path_labels = [labels[node] for node in path_nodes]
+                    sp_feature_forward = "".join(path_labels)
+                    sp_feature_backward = "".join(reversed(path_labels))
+                    # directional invariance of the paths
+                    sp_feature_path = min(sp_feature_forward, sp_feature_backward)
+                    print(sp_feature_path)
+                    feature_setSP.add(get_hash(sp_feature_path))
+
+            # Update node labels for the next iteration (WL aggregation)
+            if h<h_max:
+                current = labels[n]
+                #print(current)
+                neighbor_labels = []
+                for neighbor in graph.neighbors(n):
+                    neighbor_labels.append(labels[neighbor])
+                    #print(neighbor_labels)
+                neighbor_labels.sort()
+                combined = current + "".join(neighbor_labels)
+                #print(combined)
+                new_labels[n] = combined
+
+        # Update labels and add new features
+        if h<h_max:
+            labels = new_labels
+            for label in labels.values():
+                feature_setN.add(get_hash(label))
+        print(labels)
+        print(len(feature_setSP))
+
+    print(f"Final feature set size: {len(feature_setN)}")
+    #print(feature_setE)
+    return feature_setN, feature_setE, feature_setSP
+
+
+# --- Main Execution ---
+# Generate features for educt and product graphs
+a1,a2,a3 = getWL(educt_graph, 4)
+b1, b2,b3 = getWL(product_graph, 4)
+
+# The reaction signature is the symmetric difference of the node features.
+signature = a1.symmetric_difference(b1)
+print(signature)
+print(len(signature))
