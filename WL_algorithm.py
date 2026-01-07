@@ -103,9 +103,9 @@ def getWL(graph, h_max):
 # --- Main Execution ---
 # Generate features for educt and product graphs
 a1,a2,a3 = getWL(educt_graph, 4)
-b1, b2,b3 = getWL(product_graph, 4)
+b1,b2,b3 = getWL(product_graph, 4)
 
 # The reaction signature is the symmetric difference of the node features.
-signature = a1.symmetric_difference(b1)
-print(signature)
-print(len(signature))
+signature1 = a1.symmetric_difference(b1)
+signature2 = a2.symmetric_difference(b2)
+signature3 = a3.symmetric_difference(b3)
