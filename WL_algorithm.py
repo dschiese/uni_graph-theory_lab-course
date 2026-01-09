@@ -15,6 +15,7 @@ rsmi = '[CH3:1][CH:2]=[O:3].[CH:4]([H:7])([H:8])[CH:5]=[O:6]>>[CH3:1][CH:2]=[CH:
 
 # Parse SMILES into educt and product graphs
 educt_graph, product_graph = rsmi_to_graph(rsmi)
+its_graph = rsmi_to_its(rsmi)
 
 
 def getWL(graph, h_max):
@@ -47,7 +48,7 @@ def getWL(graph, h_max):
 
             node_pair = sorted([l_a, l_b])
             triplet = f"{node_pair[0]}{l_ab}{node_pair[1]}"
-            print(triplet)
+            #print(triplet)
             feature_setE.add(get_hash(triplet))
 
         new_labels = {}
@@ -61,7 +62,7 @@ def getWL(graph, h_max):
                     distance = shortest_pathsL[n][m]
                     node_pair = sorted([l_m, l_n])
                     sp_feature_dist = f"{node_pair[0]}-{distance}-{node_pair[1]}"
-                    print(sp_feature_dist)
+                    #print(sp_feature_dist)
                     feature_setSP.add(get_hash(sp_feature_dist))
 
                     # Concatenated labels along the shortest path
@@ -71,7 +72,7 @@ def getWL(graph, h_max):
                     sp_feature_backward = "".join(reversed(path_labels))
                     # directional invariance of the paths
                     sp_feature_path = min(sp_feature_forward, sp_feature_backward)
-                    print(sp_feature_path)
+                    #print(sp_feature_path)
                     feature_setSP.add(get_hash(sp_feature_path))
 
             # Update node labels for the next iteration (WL aggregation)
@@ -90,19 +91,22 @@ def getWL(graph, h_max):
         # Update labels and add new features
         if h<h_max:
             labels = new_labels
+            #print(labels)
             for label in labels.values():
                 feature_setN.add(get_hash(label))
-        print(labels)
+        #print(labels)
         print(len(feature_setSP))
 
     print(f"Final feature set size: {len(feature_setN)}")
-    featureUnion = feature_setN.union(feature_setE).union(feature_setSP)
-    return featureUnion
+    return feature_setN, feature_setSP, feature_setE
 
 # --- Main Execution ---
 # Generate features for educt and product graphs
-a= getWL(educt_graph, 4)
-b = getWL(product_graph, 4)
+a1, a2, a3 = getWL(educt_graph, 4)
+b1, b2, b3 = getWL(product_graph, 4)
+c1, c2, c3 = getWL(its_graph, 4)
 
 # The reaction signature is the symmetric difference of the node features.
-signature1 = a.symmetric_difference(b)
+signature1 = a1.symmetric_difference(b1)
+signature2 = a2.symmetric_difference(b2)
+signature3 = a3.symmetric_difference(b3)
