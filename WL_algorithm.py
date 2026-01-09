@@ -146,8 +146,8 @@ if __name__ == "__main__":
             "ITS Shortest Paths": sps_its
         }])], ignore_index=True)
 
-        if index > 5:
-            break
+        #if index > 5:
+        #  break
 
     # Write to Excel
-    df.to_excel("reaction_signatures_wl.xlsx", index=False)
+    df.to_excel("pre-computed-feature_sets.xlsx", index=False)
