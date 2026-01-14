@@ -7,19 +7,26 @@ import glob
 import pandas as pd
 from math import log, ceil
 
-### INTRODUCTION
+### INTRODUCTION ###
 # There are 50 different classes with 1000 reactions each in the dataset.
 
 # The repetitions depends on the reactions per class chosen. As 1000 is the maximum it is cumbersome to do many repetitions as the dataset won't vary much.
-### END INTRODUCTION
+### END INTRODUCTION ###
 
-# START CONFIGURATION VARIABLES
-CLASSES = 5
-REACTIONS_PER_CLASS = 200
-FEATURE_SET = 'DRF Shortest Paths'
-# END CONFIGURATION VARIABLES
+### START CONFIGURATION VARIABLES ###
+CLASSES = 2
+REACTIONS_PER_CLASS = 500
+FEATURE_SET = 'DRF Edges'
+
+FEATURE_SETS = ['DRF Nodes', 'DRF Edges', 'DRF Shortest Paths', 'ITS Nodes', 'ITS Edges', 'ITS Shortest Paths']
+#FEATURE_SETS = ['DRF Nodes', 'DRF Edges']
+REACTION_SETTINGS = [20, 50, 100, 200]
+CLASS_SETTINGS = [2, 5, 10, 20]
+### END CONFIGURATION VARIABLES ###
 
 dataset = pd.DataFrame()
+
+final_dataset = pd.DataFrame()
 
 def my_kernel(X1, X2):
     """
@@ -80,22 +87,38 @@ def run_single_experiment(feature_set:str, chosen_classes:list, reactions_per_cl
 
 
 def run_experiments(feature_set:str = FEATURE_SET, used_classes:int = CLASSES, reactions_per_class:int = REACTIONS_PER_CLASS):
-    scores = []
-    chosen_classes = dataset["rxn_class"].drop_duplicates().sample(n=used_classes, random_state=42)
-    repetitions = required_repetitions(reactions_per_class)
+    global final_dataset
+    class_repetitions = required_repetitions(used_classes, total=50)
+    for i in range(1, class_repetitions): # Iterate over different sets of classes of size used_classes
+        print(f"Running {i}th/{class_repetitions} experiment sets for feature set '{feature_set}' with {used_classes} classes and {reactions_per_class} reactions per class.")
+        chosen_classes = dataset["rxn_class"].drop_duplicates().sample(n=used_classes)
+        repetitions = required_repetitions(reactions_per_class, total=1000)
 
-    # TODO: Introduce for loop over different class sets to evaluate dependence on chosen classes
+        print("Running experiments for classes:", chosen_classes.tolist())
+        scores = []
+        for i in range(repetitions):
+            print(f"  Repetition {i+1}/{repetitions}")
+            score = run_single_experiment(feature_set, chosen_classes, reactions_per_class)
+            scores.append(score)
+        
+        # Summary
+        avg_score = sum(scores) / len(scores)
+        # We need: Feature Set, used classes, number of used classes, reactions per class, repetitions, average score, single scores
+        print(f"Feature Set: {feature_set}, Used Classes: {chosen_classes.tolist()}, Number of Used Classes: {used_classes}, Reactions per Class: {reactions_per_class}, Repetitions: {repetitions}, Average Score: {avg_score}, Scores: {scores}")
 
-    for i in range(repetitions):
-        score = run_single_experiment(feature_set, chosen_classes, reactions_per_class)
-        scores.append(score)
-    
-    # Summary
-    avg_score = sum(scores) / len(scores)
-    # We need: Feature Set, used classes, number of used classes, reactions per class, repetitions, average score, single scores
-    print(f"Feature Set: {feature_set}, Used Classes: {chosen_classes.tolist()}, Number of Used Classes: {used_classes}, Reactions per Class: {reactions_per_class}, Repetitions: {repetitions}, Average Score: {avg_score}, Scores: {scores}")
-    
-def required_repetitions(sample_size:int, target_coverage:float = 0.95) -> int:
+        # Write results to final_dataset (append per class set)
+        final_dataset = pd.concat([final_dataset, pd.DataFrame([{
+            "Feature Set": feature_set,
+            "Used Classes": chosen_classes.tolist(),
+            "Number of Used Classes": used_classes,
+            "Reactions per Class": reactions_per_class,
+            "Repetitions on same classes": repetitions,
+            "Repetitions of each class size": class_repetitions,
+            "Average Score": avg_score,
+            "Scores": scores
+        }])], ignore_index=True)
+
+def required_repetitions(sample_size:int, total:int, target_coverage:float = 0.95) -> int:
     """
     Calculate the number of repetitions required to achieve a target coverage
     of unique reactions in the dataset.
@@ -109,7 +132,7 @@ def required_repetitions(sample_size:int, target_coverage:float = 0.95) -> int:
     """
 
     # Using the formula: repetitions = log(1 - target_coverage) / log(1 - (sample_size / total_reactions))
-    p = sample_size / 1000 # Total reactions per class is 1000
+    p = sample_size / total # Total reactions per class is 1000
     if p >= 1.0:
         return 1
     
@@ -122,7 +145,13 @@ def required_repetitions(sample_size:int, target_coverage:float = 0.95) -> int:
 with open("data/combined_data.xlsx", "rb") as f:
     dataset = pd.read_excel(f)
 
-run_experiments()
+for feature_set in FEATURE_SETS:
+    for used_classes in CLASS_SETTINGS:
+        for reactions_per_class in REACTION_SETTINGS:
+            print(f"Running experiments for feature set '{feature_set}' with {used_classes} classes and {reactions_per_class} reactions per class.")
+            run_experiments(feature_set=feature_set, used_classes=used_classes, reactions_per_class=reactions_per_class)
+
+final_dataset.to_excel("svm_experiment_results.xlsx", index=False)
 
 
 
