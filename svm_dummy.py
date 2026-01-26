@@ -170,6 +170,8 @@ for feature_set in FEATURE_SETS:
 
 final_dataset.to_excel("svm_experiment_results.xlsx", index=False)
 
+clf.fit(X_train, Y_train)
+score = clf.score(X_test, Y_test)
 
 
 # TODO: Add used classes to compare if it depends on the classes chosen - Carefully! Needs to be evaluated on all combinations
