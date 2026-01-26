@@ -1,6 +1,7 @@
+# Exemplary code
+
 import glob
 import pandas as pd
-import random
 
 for file in glob.glob("data/*.xlsx"):
     data = pd.read_excel(file)
