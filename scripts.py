@@ -24,15 +24,19 @@ def plot_and_print_its_graphs(rsmi:str):
 
 # Takes a random sample of classes and reactions per class from the dataset
 # If classes and/or reactions_per_class is not specified, they are chosen randomly within reasonable bounds
-def create_varied_set(df: pd.DataFrame, classes:int, reactions_per_class:int) -> pd.DataFrame:
-    class_counts = df['rxn_class'].value_counts()
-    selected_classes = random.sample(list(class_counts.index), classes)
-    varied_set = pd.DataFrame()
+# Args:
+#   df: DataFrame containing the dataset with a 'rxn_class' column
+#   classes: Number of unique reaction classes to sample
+#   reactions_per_class: Number of reactions to sample per class
+# Returns:
 
-    for cls in selected_classes:
+def create_varied_set(data, chosen_classes:list, reactions_per_class:int) -> pd.DataFrame:
+    varied_set = pd.DataFrame() # Return as array of DataFrames to concatenate later
+
+    for cls in chosen_classes:
         if not reactions_per_class:
             reactions_per_class = random.randint(20, 200)
-        class_subset = df[df['rxn_class'] == cls].sample(n=reactions_per_class, random_state=42)
+        class_subset = data[data['rxn_class'] == cls].sample(n=reactions_per_class)
         varied_set = pd.concat([varied_set, class_subset])
 
     return varied_set.reset_index(drop=True)

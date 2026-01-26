@@ -1,13 +1,37 @@
 
 from sklearn import svm
 from sklearn.model_selection import train_test_split
+import numpy as np
+from scripts import create_varied_set
+import glob
+import pandas as pd
+from math import log, ceil
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
-X = # Feature vectors of reactions
-Y = # Vector of Target Labels
+### INTRODUCTION ###
+# There are 50 different classes with 1000 reactions each in the dataset.
 
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+# The repetitions depends on the reactions per class chosen. As 1000 is the maximum it is cumbersome to do many repetitions as the dataset won't vary much.
+### END INTRODUCTION ###
 
-def my_kernel(X, Y):
+### START CONFIGURATION VARIABLES ###
+CLASSES = 2
+REACTIONS_PER_CLASS = 500
+FEATURE_SET = 'DRF Edges'
+
+#FEATURE_SETS = ['DRF Nodes', 'DRF Edges', 'DRF Shortest Paths', 'ITS Nodes', 'ITS Edges', 'ITS Shortest Paths']
+FEATURE_SETS = ['DRF Edges']
+#REACTION_SETTINGS = [20, 50, 100, 200]
+REACTION_SETTINGS = [50]
+#CLASS_SETTINGS = [2, 5, 10, 20]
+CLASS_SETTINGS = [2]
+### END CONFIGURATION VARIABLES ###
+
+dataset = pd.DataFrame()
+
+final_dataset = pd.DataFrame()
+
+def my_kernel(X1, X2):
     """
     Computes the intersection kernel between two arrays of sets.
     K(x, y) = |x intersection y|
@@ -18,22 +42,137 @@ def my_kernel(X, Y):
     Returns:
         K: Kernel matrix of shape (n_samples_X, n_samples_Y).
     """
+    # Convert to list if pandas Series
+    if hasattr(X1, 'tolist'):
+        X1 = X1.tolist()
+    if hasattr(X2, 'tolist'):
+        X2 = X2.tolist()
+    
+    n_x1 = len(X1)
+    n_x2 = len(X2)
 
-    n_x = len(X)
-    n_y = len(Y)
+    K = np.zeros((n_x1, n_x2))
 
-    K = np.zeros((n_x, n_y))
-
-    for i in range(n_x):
-        for j in range(n_y):
+    for i in range(n_x1):
+        for j in range(n_x2):
             # Compute intersection size
-            K[i, j] = len(X[i].intersection(Y[j]))
+            K[i, j] = len(X1[i].intersection(X2[j]))
 
     return K
 
+def run_single_experiment(feature_set:str, chosen_classes:list, reactions_per_class:int):
+    # 2nd step: Create a varied dataset according to configuration variables
+    data = create_varied_set(dataset, chosen_classes=chosen_classes, reactions_per_class=reactions_per_class)
 
-# we create an instance of SVM and fit out data.
-clf = svm.SVC(kernel=my_kernel)
+    # 3rd step: Prepare data for SVM
+    X = data[f'{feature_set}']
+    Y = data['rxn_class']
+
+    # 4th step: Preprocess strings from the excel file into sets if possible (not so for e.g. NaN) # TODO: Add a counter for empty sets or some other sort of tracking
+    for idx in X.index:
+        x = X[idx]
+        try:
+            X[idx] = set(map(str, x.strip('{}').split(', ')))
+        except AttributeError:
+            X[idx] = set()
+
+    # 5th step: Split data into training and test set
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    #6th step: Set up SVM classifier with custom kernel
+    clf = svm.SVC(kernel=my_kernel) # Here, one may try different kernels, see documentation
+
+    # 7th step: Train model on training set
+    clf.fit(X_train, Y_train)
+
+    # 8th step: Evaluate model on test set
+    Y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(Y_test, Y_pred)
+    f1 = f1_score(Y_test, Y_pred, average='weighted')
+    precision = precision_score(Y_test, Y_pred, average='weighted', zero_division=np.nan)
+    recall = recall_score(Y_test, Y_pred, average='weighted')
+    print(f"Accuracy: {accuracy}, F1 Score: {f1}, Precision: {precision}, Recall: {recall}")
+    return accuracy, f1, precision, recall
+
+def run_experiments(feature_set:str = FEATURE_SET, used_classes:int = CLASSES, reactions_per_class:int = REACTIONS_PER_CLASS):
+    global final_dataset
+    class_repetitions = required_repetitions(used_classes, total=50)
+    for i in range(1, class_repetitions): # Iterate over different sets of classes of size used_classes
+        print(f"Running {i}th/{class_repetitions} experiment sets for feature set '{feature_set}' with {used_classes} classes and {reactions_per_class} reactions per class.")
+        chosen_classes = dataset["rxn_class"].drop_duplicates().sample(n=used_classes)
+        repetitions = required_repetitions(reactions_per_class, total=1000)
+
+        print("Running experiments for classes:", chosen_classes.tolist())
+        scores = []
+        for i in range(repetitions):
+            print(f"  Repetition {i+1}/{repetitions}")
+            accuracy, f1, precision, recall = run_single_experiment(feature_set, chosen_classes, reactions_per_class)
+            scores.append({"accuracy": accuracy, "f1": f1, "precision": precision, "recall": recall})
+        
+        # Summary
+        avg_score = {
+            "accuracy": np.mean([s["accuracy"] for s in scores]),
+            "f1": np.mean([s["f1"] for s in scores]),
+            "precision": np.mean([s["precision"] for s in scores]),
+            "recall": np.mean([s["recall"] for s in scores])
+        }
+
+        # Write results to final_dataset (append per class set)
+        final_dataset = pd.concat([final_dataset, pd.DataFrame([{
+            "Feature Set": feature_set,
+            "Used Classes": chosen_classes.tolist(),
+            "Number of Used Classes": used_classes,
+            "Reactions per Class": reactions_per_class,
+            "Repetitions on same classes": repetitions,
+            "Repetitions of each class size": class_repetitions,
+            "Average Accuracy score": avg_score["accuracy"],
+            "Average F1 score": avg_score["f1"],
+            "Average Precision score": avg_score["precision"],
+            "Average Recall score": avg_score["recall"],
+            "Accuracy Scores": [s["accuracy"] for s in scores],
+            "F1 Scores": [s["f1"] for s in scores],
+            "Precision Scores": [s["precision"] for s in scores],
+            "Recall Scores": [s["recall"] for s in scores]
+        }])], ignore_index=True)
+
+def required_repetitions(sample_size:int, total:int, target_coverage:float = 0.95) -> int:
+    """
+    Calculate the number of repetitions required to achieve a target coverage
+    of unique reactions in the dataset.
+
+    Args:
+        sample_size: Number of reactions sampled in each experiment.
+        target_coverage: Desired coverage of unique reactions (between 0 and 1).
+
+    Returns:
+        Number of repetitions needed to achieve the target coverage.
+    """
+
+    # Using the formula: repetitions = log(1 - target_coverage) / log(1 - (sample_size / total_reactions))
+    p = sample_size / total # Total reactions per class is 1000
+    if p >= 1.0:
+        return 1
+    
+    repetitions = log(1 - target_coverage) / log(1 - p)
+
+    return ceil(repetitions)
+
+
+# 1st step: Read files and load to dataset DataFrame
+with open("data/combined_data.xlsx", "rb") as f:
+    dataset = pd.read_excel(f)
+
+for feature_set in FEATURE_SETS:
+    for used_classes in CLASS_SETTINGS:
+        for reactions_per_class in REACTION_SETTINGS:
+            print(f"Running experiments for feature set '{feature_set}' with {used_classes} classes and {reactions_per_class} reactions per class.")
+            run_experiments(feature_set=feature_set, used_classes=used_classes, reactions_per_class=reactions_per_class)
+
+final_dataset.to_excel("svm_experiment_results.xlsx", index=False)
 
 clf.fit(X_train, Y_train)
 score = clf.score(X_test, Y_test)
+
+
+# TODO: Add used classes to compare if it depends on the classes chosen - Carefully! Needs to be evaluated on all combinations
+# TODO: May use other learning techniques
